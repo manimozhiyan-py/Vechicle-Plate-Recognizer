@@ -1,6 +1,5 @@
 import uuid
 from pathlib import Path
-
 from django.db import models
 from django.utils import timezone
 
@@ -9,10 +8,8 @@ def _path(folder, instance, filename):
     ext = Path(filename).suffix.lower() or ".jpg"
     return f"captures/{folder}/{timezone.now():%Y/%m/%d}/{instance.uuid}{ext}"  # blob storage directorry structure
 
-
 def original_path(instance, filename):
     return _path("original", instance, filename)
-
 
 def processed_path(instance, filename):
     return _path("processed", instance, filename)
