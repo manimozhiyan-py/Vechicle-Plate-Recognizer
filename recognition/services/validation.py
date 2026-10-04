@@ -21,6 +21,12 @@ LETTER_TO_DIGIT = {"O": "0", "Q": "0", "D": "0", "I": "1", "Z": "2", "A": "4", "
 def has_shape(text):
     return bool(STANDARD.match(text) or BH_SERIES.match(text))
 
+def is_valid(text):
+    if BH_SERIES.match(text):
+        return True
+    match = STANDARD.match(text)
+    return bool(match) and match.group(1) in STATE_CODES
+
 
 def fix_by_position(text):
     # assumes 2 state letters, 2 district digits, 1-3 series letters, 4 digits
@@ -48,8 +54,8 @@ def clean_plate(raw):
         fixed = fix_by_position(text)
         if has_shape(fixed):
             text = fixed
-    return text, has_shape(text)
-
+    return text, is_valid(text)
+    
 # validates plates
 def plate_status(raw, detector_conf, ocr_conf):
     text, valid = clean_plate(raw)
@@ -60,6 +66,7 @@ def plate_status(raw, detector_conf, ocr_conf):
     if min(detector_conf, ocr_conf) < MIN_CONFIDENCE:
         return text, "LOW_CONFIDENCE"
     return text, "OK"
+    
 
 # pass the plate status
 def capture_status(plate_statuses):
