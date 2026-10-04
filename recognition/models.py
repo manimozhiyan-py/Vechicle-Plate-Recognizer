@@ -36,10 +36,13 @@ class Capture(models.Model):
         COMPLETED = "completed"
         FAILED = "failed"          # the job crashed; details in `error`
 
+
     class Outcome(models.TextChoices):
         SUCCESS = "success"
-        NO_PLATE_DETECTED = "no_plate_detected"
+        INVALID_FORMAT = "invalid_format"    # a plate was read, but it is not a valid indian plate
+        LOW_CONFIDENCE = "low_confidence"    # valid plate, but the model is not sure
         UNREADABLE = "unreadable"
+        NO_PLATE_DETECTED = "no_plate_detected"
         INVALID_IMAGE = "invalid_image"
 
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -69,9 +72,16 @@ class Capture(models.Model):
 # Plate has the details of the successfully recongized numbers and its confidence 
 
 class Plate(models.Model):
+    class Status(models.TextChoices):
+        OK = "ok"
+        INVALID_FORMAT = "invalid_format"
+        LOW_CONFIDENCE = "low_confidence"
+        UNREADABLE = "unreadable"
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     capture = models.ForeignKey(Capture, on_delete=models.CASCADE, related_name="plates")
-    license_plate = models.CharField(max_length=30, db_index=True)
+    license_plate = models.CharField(max_length=30, db_index=True) # after cleaning and correction
+    raw_text = models.CharField(max_length=30, blank=True)          # exactly what the ocr read
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OK)# decided by the
     detector_conf = models.FloatField()
     ocr_conf = models.FloatField()
     bbox = models.JSONField() 
