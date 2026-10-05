@@ -1,0 +1,7 @@
+# Run reconcile every minute
+* * * * * root /root/.local/bin/python /app/manage.py reconcile >> /app/logs/reconcile.log 2>&1
+
+# Purge images daily at 2 AM
+0 2 * * * root /root/.local/bin/python /app/manage.py purge_images --batch-size 500 >> /app/logs/purge.log 2>&1
+
+# Ensure newline at end of file

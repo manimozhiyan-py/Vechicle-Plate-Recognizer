@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=1
+      - PLATE_MODEL_PATH=/app/models/best.pt
+    volumes:
+      - ./media:/app/media
+      - ./logs:/app/logs
+      - ./models:/app/models:ro
+
+  celery:
+    build: .
+    command: celery -A lprecognition worker -l info -c 4
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=1
+      - PLATE_MODEL_PATH=/app/models/best.pt
+    volumes:
+      - ./media:/app/media
+      - ./logs:/app/logs
+      - ./models:/app/models:ro
+
+  cron:
+    build: .
+    command: cron -f
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=1
+      - PLATE_MODEL_PATH=/app/models/best.pt
+    volumes:
+      - ./media:/app/media
+      - ./logs:/app/logs
+      - ./models:/app/models:ro
+      - ./cron/crontab:/etc/cron.d/reconcile:ro
+
+volumes:
+  redis_data:

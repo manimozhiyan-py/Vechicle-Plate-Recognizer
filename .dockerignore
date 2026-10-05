@@ -1,0 +1,60 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.coverage
+.tox
+
+# Virtual environments
+venv/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Database
+*.sqlite3
+db.sqlite3
+
+# Media uploads
+media/
+captures/
+
+# Models
+models/*.pt
+models/*.onnx
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Test/benchmark
+benchmark_queue.py
+test_*.py
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Docs
+*.md
+!README.md
