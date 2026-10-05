@@ -1,14 +1,27 @@
 import logging
+from datetime import timedelta
 
 import cv2
 import numpy as np
 from django.core.files.base import ContentFile
 from django.db import transaction
+from django.utils import timezone
 
 from ..models import Capture, Plate
 from .pipeline import recognize
 
 logger = logging.getLogger(__name__)
+
+# Retention days per outcome
+RETENTION_DAYS = {
+    Capture.Outcome.SUCCESS: 15,
+    Capture.Outcome.INVALID_FORMAT: 30,
+    Capture.Outcome.LOW_CONFIDENCE: 30,
+    Capture.Outcome.UNREADABLE: 30,
+    Capture.Outcome.INVALID_IMAGE: 30,
+    Capture.Status.FAILED: 30,
+    Capture.Outcome.NO_PLATE_DETECTED: 3,
+}
 
 # for saving the images, drawing rect as we detected
 def draw_plates(image, plates):
@@ -43,6 +56,7 @@ def save_result(capture, image, result):
     capture.processing_ms = result["processing_ms"]
     capture.model_version = result["model_version"]
     capture.status = Capture.Status.COMPLETED
+    capture.purge_after = timezone.now() + timedelta(days=RETENTION_DAYS.get(capture.outcome, 30))
     capture.save()
 
 

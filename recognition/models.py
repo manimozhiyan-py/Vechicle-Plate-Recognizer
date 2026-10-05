@@ -60,6 +60,9 @@ class Capture(models.Model):
     attempts = models.PositiveSmallIntegerField(default=0)    # times a worker claimed it
     locked_at = models.DateTimeField(null=True, blank=True)   # when the current attempt started
     queued_at = models.DateTimeField(null=True, blank=True)   # when the id was last queued
+    purge_after = models.DateTimeField(null=True, blank=True)
+    image_purged_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ["-captured_at"]
         indexes = [

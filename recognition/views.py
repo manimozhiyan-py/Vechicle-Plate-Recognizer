@@ -31,6 +31,7 @@ def capture_to_dict(capture):
         }
         for p in capture.plates.all()
     ]
+    purged = capture.image_purged_at is not None
     return {
         "uuid": str(capture.uuid),
         "camera": capture.camera_id,
@@ -40,8 +41,8 @@ def capture_to_dict(capture):
         "processing_ms": capture.processing_ms,
         "model_version": capture.model_version,
         "error": capture.error,
-        "image": capture.image.url,
-        "processed_image": capture.processed_image.url if capture.processed_image else None,
+        "image": None if purged else capture.image.url,
+        "processed_image": None if purged else (capture.processed_image.url if capture.processed_image else None),
         "plates": plates,
     }
 
