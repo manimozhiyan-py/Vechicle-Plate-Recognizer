@@ -1,10 +1,14 @@
 import numpy as np
 import cv2
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_http_methods, require_GET
+from django.db import DatabaseError, IntegrityError
 from django.http import JsonResponse
+from django.shortcuts import render
+from django.utils.dateparse import parse_datetime
+from .models import Camera, Capture, Plate
 from .services.pipeline import recognize
-
+from .services.processing import process_capture
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
 
@@ -13,20 +17,133 @@ def error(message, status):
     return JsonResponse({"error": message}, status=status)
 
 
-#bsic call to recognizer
-@csrf_exempt
-@require_POST
-def recognize_image(request):
+# turns a capture and its plates into a dict, used by every endpoint that returns a capture
+def capture_to_dict(capture):
+    plates = [
+        {
+            "uuid": str(p.uuid),
+            "license_plate": p.license_plate,
+            "raw_text": p.raw_text,
+            "status": p.status,
+            "confidence": round(min(p.detector_conf, p.ocr_conf), 3),  # the weaker of the two scores
+            "bbox": p.bbox,
+        }
+        for p in capture.plates.all()
+    ]
+    return {
+        "uuid": str(capture.uuid),
+        "camera": capture.camera_id,
+        "status": capture.status,
+        "outcome": capture.outcome,
+        "captured_at": capture.captured_at.isoformat(),
+        "processing_ms": capture.processing_ms,
+        "model_version": capture.model_version,
+        "error": capture.error,
+        "image": capture.image.url,
+        "processed_image": capture.processed_image.url if capture.processed_image else None,
+        "plates": plates,
+    }
+
+
+def create_capture(request):
+    # 1. which camera sent it
+    #we have to add auth to each camera in production
+    camera = Camera.objects.filter(code=request.POST.get("camera")).first()
+    if camera is None:
+        return error("Unknown camera.", 400)
+
+    # 2. the same key means the same frame, so return the saved result instead of processing again
+    key = request.headers.get("Idempotency-Key", "").strip() or None
+    if key:
+        existing = Capture.objects.filter(idempotency_key=key).first()
+        if existing:
+            return JsonResponse(capture_to_dict(existing))
+
+    # 3. checks on the file
     upload = request.FILES.get("image")
     if upload is None:
-        return error({"error": "Send an image in the 'image' field."}, status=400)
+        return error("Send an image in the 'image' field.", 400)
     if upload.size > MAX_UPLOAD_BYTES:
         return error("Image is larger than 10 MB.", 413)
 
     data = np.frombuffer(upload.read(), np.uint8)
-    image = cv2.imdecode(data, cv2.IMREAD_COLOR) #for 3 channel image
-
+    image = cv2.imdecode(data, cv2.IMREAD_COLOR)  # for 3 channel image
     if image is None:
         return error("The file is not a valid image.", 400)
+    upload.seek(0)  # we read the file above, rewind it so it can be saved
 
-    return JsonResponse(recognize(image))
+    # 4. optional time from the camera, defaults to now, in future we could make it pass it from cam like current image.
+    captured_at = request.POST.get("captured_at")
+    if captured_at:
+        captured_at = parse_datetime(captured_at)
+        if captured_at is None:
+            return error("captured_at must look like 2026-10-04T12:30:00+05:30.", 400)
+
+    # 5. save first, so the image is never lost even if processing crashes
+    capture = Capture(camera=camera, image=upload, idempotency_key=key)
+    if captured_at:
+        capture.captured_at = captured_at
+    try:
+        capture.save() # wrriting here
+    except IntegrityError:
+        if key is None:
+            raise
+        # the same key arrived twice at the same moment, the other request won
+        return JsonResponse(capture_to_dict(Capture.objects.get(idempotency_key=key)))
+
+    # 6, run the recognizer, this never raises, a crash is stored as status "failed"
+    process_capture(capture)
+    return JsonResponse(capture_to_dict(capture), status=201)
+
+
+def list_captures(request):
+    captures = Capture.objects.select_related("camera").prefetch_related("plates")
+    for field in ("camera", "status", "ouat the same motcome"):  # ?camera=CAM-01&outcome=invalid_format
+        value = request.GET.get(field)
+        if value:
+            captures = captures.filter(**{field: value})
+    return JsonResponse({"results": [capture_to_dict(c) for c in captures[:50]]})
+
+
+# one url, two jobs: POST uploads an image, GET lists captures
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def captures(request):
+    if request.method == "POST":
+        return create_capture(request)
+    return list_captures(request)
+
+
+@require_GET
+def get_capture(request, capture_id):
+    capture = Capture.objects.filter(pk=capture_id).first()
+    if capture is None:
+        return error("Capture not found.", 404)
+    return JsonResponse(capture_to_dict(capture))
+
+
+@require_GET
+def list_cameras(request):
+    cameras = [
+        {"code": c.code, "name": c.name, "location": c.location}
+        for c in Camera.objects.order_by("code")
+    ]
+    return JsonResponse({"results": cameras})
+
+
+def upload_page(request):
+    return render(request, "lprecognition/upload.html")
+
+@require_GET
+def health(request):
+    try:
+        Camera.objects.exists()
+    except DatabaseError:
+        return JsonResponse(
+            {"status": "unavailable"},
+            status=503
+        )
+
+    return JsonResponse(
+        {"status": "ok"}
+    )
