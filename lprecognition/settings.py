@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -120,6 +121,15 @@ STATIC_URL = 'static/'
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# Celery
+
+
+CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+CELERY_TASK_ACKS_LATE = True            # acknowledge after the work, not before
+CELERY_WORKER_PREFETCH_MULTIPLIER = 2   # one job at a time per worker process
+CELERY_TASK_TIME_LIMIT = 120           
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 
 # Email

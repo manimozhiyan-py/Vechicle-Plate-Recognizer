@@ -57,7 +57,9 @@ class Capture(models.Model):
     model_version = models.CharField(max_length=100, blank=True)
     error = models.TextField(blank=True)
     idempotency_key = models.CharField(max_length=255, unique=True, null=True, blank=True)
-
+    attempts = models.PositiveSmallIntegerField(default=0)    # times a worker claimed it
+    locked_at = models.DateTimeField(null=True, blank=True)   # when the current attempt started
+    queued_at = models.DateTimeField(null=True, blank=True)   # when the id was last queued
     class Meta:
         ordering = ["-captured_at"]
         indexes = [

@@ -9,6 +9,7 @@ from django.utils.dateparse import parse_datetime
 from .models import Camera, Capture, Plate
 from .services.pipeline import recognize
 from .services.processing import process_capture
+from .tasks import enqueue
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
 
@@ -83,16 +84,10 @@ def create_capture(request):
     capture = Capture(camera=camera, image=upload, idempotency_key=key)
     if captured_at:
         capture.captured_at = captured_at
-    try:
-        capture.save() # wrriting here
-    except IntegrityError:
-        if key is None:
-            raise
-        # the same key arrived twice at the same moment, the other request won
-        return JsonResponse(capture_to_dict(Capture.objects.get(idempotency_key=key)))
+    capture.save()  # let any IntegrityError bubble up for debugging
 
     # 6, run the recognizer, this never raises, a crash is stored as status "failed"
-    process_capture(capture)
+    enqueue(capture.uuid)
     return JsonResponse(capture_to_dict(capture), status=201)
 
 
