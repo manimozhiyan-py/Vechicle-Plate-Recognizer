@@ -25,7 +25,6 @@ def process_capture_task(capture_id):
 
 
 def enqueue(capture_id):
-    print(capture_id)
     """Put one capture on the queue. Returns False if the broker is down.
     The row is already saved, so the reconciler will pick it up later."""
     try:
