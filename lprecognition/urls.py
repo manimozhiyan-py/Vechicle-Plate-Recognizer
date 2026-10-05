@@ -15,10 +15,16 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.conf import settings
+from django.conf.urls.static import static
 from django.urls import path
-from recognition.views import recognize_image
+from recognition import views
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('api/recognize/',  recognize_image) # basic testing url
-]
+    path("admin/", admin.site.urls),
+    path("", views.upload_page, name="upload"),
+    path("api/health/", views.health, name="health"),
+    path("api/cameras/", views.list_cameras, name="cameras"),
+    path("api/captures/", views.captures, name="captures"),
+    path("api/captures/<uuid:capture_id>/", views.get_capture, name="capture-detail"),
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)  # serves uploaded images, only when DEBUG is on, just for getting the file for debuggin if needed
