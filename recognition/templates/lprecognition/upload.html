@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plate recognition</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; color: #1b2230; }
+    select, button { font: inherit; padding: .6rem; width: 100%; margin-bottom: 1rem; }
+    button { background: #f2c230; border: 0; border-radius: 6px; font-weight: 700; cursor: pointer; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    #drop { border: 2px dashed #aab; border-radius: 8px; padding: 2rem 1rem; text-align: center; cursor: pointer; margin-bottom: 1rem; }
+    #drop.over { border-color: #f2c230; background: #fffbe6; }
+    img { max-width: 100%; margin-top: 1rem; border-radius: 6px; }
+    .plate { display: inline-block; border: 2px solid #1b2230; border-radius: 6px; padding: .2rem .8rem; font: 700 1.5rem monospace; letter-spacing: .1em; }
+    .ok { color: #1d7a46; } .warn { color: #9a5b00; } .err { color: #b3261e; }
+  </style>
+</head>
+<body>
+  <h1>Read a number plate</h1>
+
+  <label for="camera">Camera</label>
+  <select id="camera"><option value="">Loading cameras...</option></select>
+
+  <div id="drop">Drop an image here, or click to choose a file</div>
+  <input type="file" id="file" accept="image/*" hidden>
+  <img id="preview" alt="Selected image" hidden>
+
+  <button id="go" disabled>Read plate</button>
+  <div id="result"></div>
+
+<script>
+  const CAMERAS_URL = "{% url 'cameras' %}";
+  const CAPTURES_URL = "{% url 'captures' %}";
+
+  const camera = document.getElementById("camera");
+  const drop = document.getElementById("drop");
+  const fileInput = document.getElementById("file");
+  const preview = document.getElementById("preview");
+  const go = document.getElementById("go");
+  const result = document.getElementById("result");
+
+  let file = null;
+  let key = null;  // one key per file and camera, so clicking again returns the saved result
+
+  const newKey = () => crypto.randomUUID ? crypto.randomUUID() : Date.now() + "-" + Math.random();
+  const refresh = () => { go.disabled = !(file && camera.value); };
+
+  // adds a line to the result area, text is set with textContent so nothing is run as html
+  function add(tag, text, className) {
+    const node = document.createElement(tag);
+    node.textContent = text;
+    if (className) node.className = className;
+    result.append(node);
+    return node;
+  }
+
+  async function loadCameras() {
+    try {
+      const res = await fetch(CAMERAS_URL);
+      const data = await res.json();
+      camera.replaceChildren(new Option("Choose a camera", ""));
+      data.results.forEach((c) => camera.append(new Option(c.code + " (" + c.name + ")", c.code)));
+    } catch {
+      camera.replaceChildren(new Option("Could not load cameras", ""));
+    }
+  }
+
+  function setFile(chosen) {
+    if (!chosen || !chosen.type.startsWith("image/")) return;
+    file = chosen;
+    key = newKey();
+    preview.src = URL.createObjectURL(chosen);
+    preview.hidden = false;
+    drop.textContent = chosen.name + " (click to choose another)";
+    refresh();
+  }
+
+  function render(c) {
+    result.replaceChildren();
+    if (c.status === "failed") {
+      add("p", "Processing failed: " + c.error, "err");
+      return;
+    }
+    const messages = {
+      success: ["Plate found", "ok"],
+      needs_review: ["Plate found, please check it", "warn"],
+      no_plate_detected: ["No plate detected", "warn"],
+      unreadable: ["A plate was found but could not be read", "warn"],
+      invalid_image: ["The file is not a valid image", "err"],
+    };
+    const [text, cls] = messages[c.outcome] || ["Still processing...", "warn"];
+    add("p", text + " (" + c.processing_ms + " ms)", cls);
+
+    c.plates.forEach((p) => {
+      const row = add("p");
+      const plate = document.createElement("span");
+      plate.className = "plate";
+      plate.textContent = p.license_plate || "?";
+      row.append(plate, " " + Math.round(p.confidence * 100) + "% confidence");
+      if (!p.valid_format) row.append(" - not a valid plate format");
+    });
+
+    const img = document.createElement("img");
+    img.src = c.processed_image || c.image;
+    img.alt = "Image with the plates marked";
+    result.append(img);
+  }
+
+  async function submit() {
+    go.disabled = true;
+    result.textContent = "Reading...";
+    const form = new FormData();
+    form.append("camera", camera.value);
+    form.append("image", file);
+    try {
+      const res = await fetch(CAPTURES_URL, { method: "POST", body: form, headers: { "Idempotency-Key": key } });
+      const data = await res.json();
+      if (res.ok) render(data);
+      else { result.replaceChildren(); add("p", data.error, "err"); }
+    } catch {
+      result.replaceChildren();
+      add("p", "Could not reach the server.", "err");
+    }
+    refresh();
+  }
+
+  drop.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => setFile(fileInput.files[0]));
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+  drop.addEventListener("drop", (e) => {
+    e.preventDefault();
+    drop.classList.remove("over");
+    setFile(e.dataTransfer.files[0]);
+  });
+  camera.addEventListener("change", () => { key = newKey(); refresh(); });
+  go.addEventListener("click", submit);
+
+  loadCameras();
+</script>
+</body>
+</html>
