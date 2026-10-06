@@ -94,7 +94,7 @@ def create_capture(request):
 
 def list_captures(request):
     captures = Capture.objects.select_related("camera").prefetch_related("plates")
-    for field in ("camera", "status", "ouat the same motcome"):  # ?camera=CAM-01&outcome=invalid_format
+    for field in ("camera", "status", "outcome"):  # ?camera=CAM-01&outcome=invalid_format
         value = request.GET.get(field)
         if value:
             captures = captures.filter(**{field: value})
