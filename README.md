@@ -1,7 +1,5 @@
 # License Plate Recognition System
 
-A scalable, queue-based license plate recognition system built with Django, Celery, and Redis.
-
 ### Setup Instructions
 
 ##### Local Development
