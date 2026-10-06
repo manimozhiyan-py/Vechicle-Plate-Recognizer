@@ -127,7 +127,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 CELERY_TASK_ACKS_LATE = True            # acknowledge after the work, not before
-CELERY_WORKER_PREFETCH_MULTIPLIER = 2   # one job at a time per worker process
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1   # low to increase fast distribution
 CELERY_TASK_TIME_LIMIT = 120           
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
