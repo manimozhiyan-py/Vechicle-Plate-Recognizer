@@ -78,7 +78,7 @@ images ---> POST API ---> saves in BLOB storage & creates row in DB with 'proces
 
 #### Architecture
 
-![[architecture.png]]
+![[docs/architecture.png]]
 
 
 Recognition is the core but here the system build around it is what important. So I focused more on designing that system. Design details explained in working in detail.
