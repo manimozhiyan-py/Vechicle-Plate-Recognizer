@@ -24,6 +24,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("", views.upload_page, name="upload"),
     path("api/health/", views.health, name="health"),
+    path("health/", views.health, name="health-legacy"),  # legacy alias
     path("api/cameras/", views.list_cameras, name="cameras"),
     path("api/captures/", views.captures, name="captures"),
     path("api/captures/<uuid:capture_id>/", views.get_capture, name="capture-detail"),

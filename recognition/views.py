@@ -132,14 +132,39 @@ def upload_page(request):
 
 @require_GET
 def health(request):
+    checks = {}
+
+    # Database
     try:
         Camera.objects.exists()
-    except DatabaseError:
-        return JsonResponse(
-            {"status": "unavailable"},
-            status=503
-        )
+        Capture.objects.exists()
+        checks["database"] = "ok"
+    except DatabaseError as e:
+        checks["database"] = f"error: {e}"
+
+    # Celery broker (Redis/RabbitMQ)
+    try:
+        from lprecognition.celery import app
+        with app.connection() as conn:
+            conn.ensure_connection(max_retries=1)
+        checks["broker"] = "ok"
+    except Exception as e:
+        checks["broker"] = f"error: {e}"
+
+    # Celery workers (active)
+    try:
+        from lprecognition.celery import app
+        inspect = app.control.inspect()
+        active = inspect.active()
+        checks["workers"] = "ok" if active else "no_active_workers"
+    except Exception as e:
+        checks["workers"] = f"error: {e}"
+
+    # Overall status
+    all_ok = all(v == "ok" for v in checks.values())
+    status_code = 200 if all_ok else 503
 
     return JsonResponse(
-        {"status": "ok"}
+        {"status": "ok" if all_ok else "degraded", "checks": checks},
+        status=status_code
     )
