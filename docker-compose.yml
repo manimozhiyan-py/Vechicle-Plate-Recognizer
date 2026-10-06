@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   redis:
     image: redis:7-alpine
@@ -48,6 +46,7 @@ services:
   cron:
     build: .
     command: cron -f
+    user: root
     depends_on:
       redis:
         condition: service_healthy
