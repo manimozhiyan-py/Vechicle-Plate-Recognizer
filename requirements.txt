@@ -2,10 +2,9 @@ Django>=5.0,<6.0
 djangorestframework>=3.14
 celery>=5.3
 redis>=5.0
-
-
 opencv-python-headless>=4.8
 ultralytics>=8.0
 fast-plate-ocr>=1.0
+fast-plate-ocr[onnx]>=1.0
 Pillow>=10.0
 numpy>=1.24

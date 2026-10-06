@@ -13,7 +13,7 @@ services:
 
   web:
     build: .
-    command: python manage.py runserver 0.0.0.0:8000
+    command: sh -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
     ports:
       - "8000:8000"
     depends_on:
@@ -27,6 +27,7 @@ services:
       - ./media:/app/media
       - ./logs:/app/logs
       - ./models:/app/models:ro
+      - ./db.sqlite3:/app/db.sqlite3
 
   celery:
     build: .
@@ -42,6 +43,7 @@ services:
       - ./media:/app/media
       - ./logs:/app/logs
       - ./models:/app/models:ro
+      - ./db.sqlite3:/app/db.sqlite3
 
   cron:
     build: .
@@ -58,7 +60,9 @@ services:
       - ./media:/app/media
       - ./logs:/app/logs
       - ./models:/app/models:ro
+      - ./db.sqlite3:/app/db.sqlite3
       - ./cron/crontab:/etc/cron.d/reconcile:ro
 
 volumes:
   redis_data:
+  db_data:
