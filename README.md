@@ -307,4 +307,54 @@ python simulate_cameras.py --cameras 5 --per-camera 10 --wait
 python benchmark_queue.py # data in this file are gathered from log.
 
 ```
+---
+### Scalability & Production Considerations
+
+#### The number of images increased significantly.
+
+- Images will be queued so no drop. Even if queue dropped, Reconciler DB polling make sure to re-queue the image for worker.
+- Add more Celery Worker across machines
+- If S3 bucket filled up, sweeper keeps the storage clean.
+- If no. of images hit the API and it became bottleneck, add gunicorn ( -w 4)
+
+#### Multiple Cameras Sending Simultaneously
+
+- Idempotency keys prevent duplicate processing on retries
+- Queue will handle Multiple camera job allocation.
+- If Multiple camera hit the API and it became bottleneck, add gunicorn ( -w 4)
+- Rate limiting (add Django Ratelimit or Nginx `limit_req`) protects against abusive cameras
+
+#### CPU/GPU-Intensive Processing
+
+- Currently CPU-only running model, let's put in on GPU Workers
+- Batching the images: accumulate N images, run inference once (better GPU utilization)
+-  Shared model server (Triton, TorchServe) or worker-local cache 
+  
+#### Unprocessable Images (Failures)
+
+- Failed should be viewed by develop so we could use it to train our model. 
+- In current porototype, 
+	- `INVALID_IMAGE` (400), no queue 
+	- `NO_PLATE_DETECTED` outcome, 3-day retention 
+	- `LOW_CONFIDENCE` / `INVALID_FORMAT`, 30-day retention for review 
+	- Reconciler detects `PROCESSING` > 5min → re-queues (max 3 attempts)
+	- `FAILED` status, error logged, 30-day retention
+	- `attempts > 3` stops retry; alert on `FAILED` spike
+---
+#### Production Reliability
+
+Current : 
+- Docker compose for  reliable deployment
+
+Suggestion :
+- Set up monitoring
+- use Gunicorn
+- Currently worker in single machine, deploy it in K8s Deployement
+- Auth for per camera, and JWT for admin
+- Redis for prototype, use RabbitMQ for prod
+- SQlite for prototype, use Postgres for prod
+- Set up S3/R2 file storage instead of local storage
+---
+
+  
 
